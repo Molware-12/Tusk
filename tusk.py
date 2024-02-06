@@ -1,13 +1,15 @@
+import time
 import re
 import subprocess
 import socket
 import threading
+import os
 import logging
 
 class Tusk:
     def __init__(self, ip: str):
         self.ip = ip
-        self.open_ports = []
+        self.open_ports = {}
         self.print_lock = threading.Lock() # this is a print lock to ensure synchronized printing across threads being used
         
     
@@ -51,7 +53,7 @@ class Tusk:
             logging.warning(f"Error while retrieving MAC address for {ip}: {e}")
             return "Error"
     
-    def ping_scan(self):
+    def tusk_scan(self):
         ip_addresses = self.ip_range()
         print("Sniffing...")
         for ip in ip_addresses:
@@ -62,8 +64,18 @@ class Tusk:
 
                 search = re.search(f"Reply from {ip}: bytes=", stdout_str)
                 mac_addresses = self.mac(ip)
+                
+                # Check if the port scan for this IP has already been performed for every successfully pinged ip
                 if search:
-                    logging.info(f"IP: {ip}. MAC: {mac_addresses}.")
+                    # if IP is up, perform port scan
+                    if ip not in self.open_ports:
+                        ports = self.port_scan(ip, 1, 500)
+                        self.open_ports[ip] = ports
+                    else:
+                        ports = self.open_ports[ip]
+                        if len(ports) < 1:
+                            ports = "No open ports"
+                    logging.info(f"IP: {ip}. MAC: {mac_addresses}. Open-Ports: {ports}")
                 else:
                     logging.info(f"{ip} is down")
                 
@@ -71,24 +83,26 @@ class Tusk:
                 logging.warning(f"{ip} is down.")
             except subprocess.TimeoutExpired:
                 logging.warning(f"{ip} is down (timeout).")
-    
-    def connect(self, port):
+
+
+    def connect(self, ip, port):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            sock.connect((self.ip, port))
+            sock.connect((ip, port))
             with self.print_lock:
-                self.open_ports.append(port)
+                self.open_ports[ip].append(port)
         except Exception as e:
             pass
         finally:
             sock.close()
 
-    def port_scan(self, start_port, end_port):
+    def port_scan(self, ip, start_port, end_port):
+        self.open_ports[ip] = []  # Initialize the list for this IP
         threads = []
+        threads.clear()
 
         for port in range(start_port, end_port + 1):
-            thread = threading.Thread(target=self.connect, args=(port,))
-            # Set the thread as daemon so that it won't prevent the program from exiting
+            thread = threading.Thread(target=self.connect, args=(ip, port,))
             thread.daemon = True
             threads.append(thread)
             thread.start()
@@ -96,5 +110,4 @@ class Tusk:
         for thread in threads:
             thread.join()
 
-        return self.open_ports
-    # The port functions make the scan a lot longer than it needs to be, so I would love for anyone to help out and commit to the project to fix this problem
+        return self.open_ports[ip]
