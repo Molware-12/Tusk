@@ -83,6 +83,7 @@ class Tusk:
                 logging.warning(f"{ip} is down.")
             except subprocess.TimeoutExpired:
                 logging.warning(f"{ip} is down (timeout).")
+            # If anyone can help me use threading for sending out pings i'd appreciate it because I had some odd errors come up whenever I tried using threading with the ping probes.
 
 
     def connect(self, ip, port):
