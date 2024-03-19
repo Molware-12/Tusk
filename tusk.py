@@ -3,7 +3,6 @@ import re
 import subprocess
 import socket
 import threading
-import os
 import logging
 
 class Tusk:
@@ -18,7 +17,7 @@ class Tusk:
         rev_ip = self.ip[::-1] 
         # ^ gets the reverse of the contructor ip to obtain the last octet: an octet are the values separated by periods.
         per = "." # string of period to find it later on
-        max = int(input("Highest octet number: "))
+        max = 255
 
         for dot in rev_ip:
             if per == dot:
@@ -29,6 +28,8 @@ class Tusk:
         current_octet = 0
         while True:
             if current_octet == max:
+                break
+            if current_octet == 255:
                 break
             current_octet += 1
             num = str(current_octet)
@@ -54,37 +55,47 @@ class Tusk:
             return "Error"
     
     def tusk_scan(self):
+        stime = time.time()
         ip_addresses = self.ip_range()
         print("Sniffing...")
+        threads = []
+
         for ip in ip_addresses:
-            try:
-                output = subprocess.Popen(["ping", "-n", "1", ip], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                stdout, stderr = output.communicate()
-                stdout_str = stdout.decode('utf-8')
+            thread = threading.Thread(target=self.scan_ip, args=(ip,))
+            thread.start()
+            threads.append(thread)
 
-                search = re.search(f"Reply from {ip}: bytes=", stdout_str)
-                mac_addresses = self.mac(ip)
-                
-                # Check if the port scan for this IP has already been performed for every successfully pinged ip
-                if search:
-                    # if IP is up, perform port scan
-                    if ip not in self.open_ports:
-                        ports = self.port_scan(ip, 1, 500)
-                        self.open_ports[ip] = ports
-                    else:
-                        ports = self.open_ports[ip]
-                        if len(ports) < 1:
-                            ports = "No open ports"
-                    logging.info(f"IP: {ip}. MAC: {mac_addresses}. Open-Ports: {ports}")
+        for thread in threads:
+            thread.join()
+
+        etime = time.time()
+        print(f"Elapsed time {round(etime - stime, 2)}s")
+
+    def scan_ip(self, ip):
+        try:
+            output = subprocess.Popen(["ping", "-n", "1", ip], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = output.communicate()
+            stdout_str = stdout.decode('utf-8')
+
+            search = re.search(f"Reply from {ip}: bytes=", stdout_str)
+            mac_addresses = self.mac(ip)
+
+            # Check if the port scan for this IP has already been performed for every successfully pinged ip
+            if search:
+                # if IP is up, perform port scan
+                if ip not in self.open_ports:
+                    ports = self.port_scan(ip, 1, 500)
+                    self.open_ports[ip] = ports
                 else:
-                    logging.info(f"{ip} is down")
-                
-            except subprocess.CalledProcessError:
-                logging.warning(f"{ip} is down.")
-            except subprocess.TimeoutExpired:
-                logging.warning(f"{ip} is down (timeout).")
-            # If anyone can help me use threading for sending out pings i'd appreciate it because I had some odd errors come up whenever I tried using threading with the ping probes.
+                    ports = self.open_ports[ip]
+                    if len(ports) < 1:
+                        ports = "No open ports"
+                logging.info(f"IP: {ip}. MAC: {mac_addresses}. Open-Ports: {ports}")
 
+        except subprocess.CalledProcessError:
+            logging.warning(f"{ip} is down.")
+        except subprocess.TimeoutExpired:
+            logging.warning(f"{ip} is down (timeout).")
 
     def connect(self, ip, port):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
