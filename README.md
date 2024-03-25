@@ -1,12 +1,12 @@
 # Tusk
-Tusk is a network scanning tool, that retrieves internet protocol (IP) addresses from a network, with a corresponding Media Access Control (MAC) address and any open ports. 
+Tusk is a network scanning tool, that retrieves private internet protocol (IP) addresses from a network, with a corresponding Media Access Control (MAC) address and any open ports. Tusk is also a port scanner, which can scan all possible 65535 ports relatively quickly.
 
 ## Features
 
-- **IP Range Scanning**: Scans a range of IP addresses for active hosts.
+- **IP Range Scanning**: Scans a range of IP addresses for active hosts on a network.
 - **MAC Address Retrieval**: Retrieves the MAC address of discovered hosts.
 - **Ping Scan**: Uses ICMP ping to check the availability of hosts.
-- **Port Scanning**: Scans a range of ports on a target host. This is not currently being implemented as it makes the code run for too long, I would love any contributions, as they as well as bug reports are welcome! If you want to improve Tusk:
+- **Port Scanning**: Scans a range of ports on a target host.
 
 ## Configuration
 
