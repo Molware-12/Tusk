@@ -3,6 +3,7 @@ import re
 import subprocess
 import socket
 import threading
+import os
 import logging
 
 class Tusk:
@@ -49,19 +50,25 @@ class Tusk:
             if mac_address_match:
                 return mac_address_match.group()
             else:
-                return "MAC address not found"
+                # No MAC address found
+                return None
         except subprocess.CalledProcessError as e:
+            # Log the error and return None
             logging.warning(f"Error while retrieving MAC address for {ip}: {e}")
-            return "Error"
+            return None
+        except UnicodeDecodeError as e:
+            # Handle decoding errors
+            logging.warning(f"Error decoding ARP output for {ip}: {e}")
+            return None
     
-    def tusk_scan(self):
+    def tusk_scan(self, max_port):
         stime = time.time()
         ip_addresses = self.ip_range()
         print("Sniffing...")
         threads = []
 
         for ip in ip_addresses:
-            thread = threading.Thread(target=self.scan_ip, args=(ip,))
+            thread = threading.Thread(target=self.scan_ip, args=(ip,max_port,))
             thread.start()
             threads.append(thread)
 
@@ -71,7 +78,7 @@ class Tusk:
         etime = time.time()
         print(f"Elapsed time {round(etime - stime, 2)}s")
 
-    def scan_ip(self, ip):
+    def scan_ip(self, ip, max_port):
         try:
             output = subprocess.Popen(["ping", "-n", "1", ip], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = output.communicate()
@@ -84,7 +91,7 @@ class Tusk:
             if search:
                 # if IP is up, perform port scan
                 if ip not in self.open_ports:
-                    ports = self.port_scan(ip, 1, 500)
+                    ports = self.port_scan(ip, 1, max_port)
                     self.open_ports[ip] = ports
                 else:
                     ports = self.open_ports[ip]
@@ -123,3 +130,13 @@ class Tusk:
             thread.join()
 
         return self.open_ports[ip]
+    
+    def single_port_scan(self):
+        stime = time.time()
+        ports = self.port_scan(self.ip, 1, int(input("Highest port: ")))
+        print(f"Open-Ports: for {self.ip} {ports}")
+        etime = time.time()
+        print(f"Elapsed time {round(etime - stime, 2)}s")
+    
+    def single_mac(self):
+        print(self.mac(self.ip))
